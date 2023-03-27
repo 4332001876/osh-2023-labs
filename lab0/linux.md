@@ -1,0 +1,1 @@
+![pic](src\linux_lshw.png)
