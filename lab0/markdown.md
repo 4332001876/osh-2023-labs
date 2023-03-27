@@ -1,4 +1,4 @@
-![ОГАС](src\OGAS.jfif)
+![ОГАС](src/OGAS.jfif)
 ```C
     void bi_traverse(t_node *root, void (*funptr)(t_node *)) //双序遍历
     {

@@ -1,1 +1,1 @@
-![pic](src\linux_lshw.png)
+![pic](src/linux_lshw.png)
