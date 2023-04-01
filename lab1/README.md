@@ -76,6 +76,9 @@ Hello! PB21030838
 ```
 则只需要在init.c中触发异常，令init进程的执行被中断；或者令init.c的运行对操作系统的其它重要部分造成破坏（如内核堆栈溢出、指针异常访问等）时，就会触发Kernel Panic.
 
+## 添加自定义系统调用
+如图，syscall成功被调用且正确运行：
+<img src="./src/syscall%20success.png" width="90%">
 
 
 ## 附：实验要求
