@@ -9,7 +9,7 @@ all: $(SOURCES) $(EXECUTABLE)
 $(EXECUTABLE): $(OBJECTS)
     $(CC) $(OBJECTS) -o $@
 
-.cpp.o:
+.cpp.o:   #。cpp->.o 后缀规则
     $(CC) $(CFLAGS) $< -o $@
 
 clean:
