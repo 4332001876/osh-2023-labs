@@ -14,6 +14,7 @@
 #include <sys/wait.h>
 
 std::vector<std::string> split(std::string s, const std::string &delimiter);
+void external_command(std::vector<std::string> args);
 
 int main()
 {
@@ -67,7 +68,7 @@ int main()
 
         if (args[0] == "pwd") // 打印当前目录
         {
-            char *pwd_buf[256];
+            char pwd_buf[256];
             // char *getcwd(char *buf, size_t size);
             getcwd(pwd_buf, 255);
             std::cout << pwd_buf;
@@ -79,7 +80,7 @@ int main()
             // int chdir(const char *path);
             if (args.size() > 1)
             {
-                chdir(args[1]);
+                chdir(args[1].c_str());
                 // std::cout << "To be done!\n";
             }
             else
