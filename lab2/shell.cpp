@@ -12,6 +12,8 @@
 #include <unistd.h>
 // wait
 #include <sys/wait.h>
+// getenv()
+#include <cstdlib>
 
 std::vector<std::string> split(std::string s, const std::string &delimiter);
 void external_command(std::vector<std::string> args);
@@ -71,7 +73,7 @@ int main()
             char pwd_buf[256];
             // char *getcwd(char *buf, size_t size);
             getcwd(pwd_buf, 255);
-            std::cout << pwd_buf;
+            std::cout << pwd_buf << "\n";
             continue;
         }
 
@@ -85,7 +87,7 @@ int main()
             }
             else
             {
-                chdir("~");
+                chdir(getenv("HOME"));
             }
             continue;
         }
