@@ -14,6 +14,13 @@
 #include <sys/wait.h>
 // getenv()
 #include <cstdlib>
+// 用于logging函数中的可变参数列表
+#include <cstdarg>
+
+#define LOGGING_LEVEL 1 // 日志级别
+#define DEBUGGING 1
+#define INFO 2
+#define WARNING 3
 
 #define ERRNO_LIBRARY_FUN_FAILED 10
 #define ERRNO_EXEC_FAIL 255
@@ -54,6 +61,19 @@ int main()
         }
         // 按管道分隔
         command_group cmd_grp = command_grouping(args, "|");
+
+        if (LOGGING_LEVEL <= DEBUGGING)
+        {
+            int i, j;
+            for (i = 0; i < cmd_grp.size(); i++)
+            {
+                for (j = 0; j < cmd_grp[i].size(); j++)
+                {
+                    std::cout << cmd_grp[i][j].c_str() << " ";
+                }
+                std::cout << "\n";
+            }
+        }
 
         int read_fd; // 上一个管道的读端口，即该条命令的输入
         for (int i = 0; i < cmd_grp.size(); i++)
