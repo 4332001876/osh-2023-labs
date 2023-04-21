@@ -15,8 +15,16 @@
 // getenv()
 #include <cstdlib>
 
-std::vector<std::string> split(std::string s, const std::string &delimiter);
-void external_command(std::vector<std::string> args);
+#define ERRNO_LIBRARY_FUN_FAILED 10
+#define ERRNO_EXEC_FAIL 255
+
+typedef std::vector<std::string> command;
+typedef std::vector<command> command_group;
+
+command split(std::string s, const std::string &delimiter);
+command_group command_grouping(command args, const std::string &delimiter);
+void exec_command(command args);
+void external_command(command args);
 
 int main()
 {
@@ -37,70 +45,121 @@ int main()
         std::getline(std::cin, cmd);
 
         // 按空格分割命令为单词
-        std::vector<std::string> args = split(cmd, " ");
+        command args = split(cmd, " ");
 
         // 没有可处理的命令
         if (args.empty())
         {
             continue;
         }
+        // 按管道分隔
+        command_group cmd_grp = command_grouping(args, "|");
 
-        // 退出指令，已完工
-        if (args[0] == "exit")
+        int read_fd; // 上一个管道的读端口，即该条命令的输入
+        for (int i = 0; i < cmd_grp.size(); i++)
         {
-            if (args.size() <= 1)
+            int pipefd[2];               // 0为读出管道端口（接第i+1条指令），1为写入端口（接第i条指令）
+            if (i != cmd_grp.size() - 1) // 最后一次循环中不创建管道
             {
-                return 0;
+                int pipe_ret = pipe(pipefd); // 创建管道
+                if (pipe_ret < 0)
+                {
+                    std::cout << "Failed to create pipe!\n";
+                    exit(ERRNO_LIBRARY_FUN_FAILED);
+                }
             }
 
-            // std::string 转 int
-            std::stringstream code_stream(args[1]);
-            int code = 0;
-            code_stream >> code;
-
-            // 转换失败
-            if (!code_stream.eof() || code_stream.fail())
+            int pid = fork();
+            if (pid == 0) // 第i条命令
             {
-                std::cout << "Invalid exit code\n";
-                continue;
-            }
+                // 重定向输出
+                if (i != cmd_grp.size() - 1)
+                {
+                    close(pipefd[0]); // 最后一条命令里pipe没有新建，故不需要关闭此端口
+                    dup2(pipefd[1], STDOUT_FILENO);
+                    close(pipefd[1]);
+                }
 
-            return code;
+                // 重定向输入
+                if (i != 0)
+                {
+
+                    dup2(read_fd, STDOUT_FILENO);
+                    close(read_fd);
+                }
+
+                exec_command(cmd_grp[i]);
+            }
+            // 关闭父进程无用的管道端口
+            if (i != 0)
+                close(read_fd); // 已分发给子进程，可关闭
+            if (i != cmd_grp.size() - 1)
+            {
+                read_fd = pipefd[0]; // 保存下一条命令需要的读端口
+                close(pipefd[1]);    // 已分发给子进程，可关闭
+            }
         }
-
-        if (args[0] == "pwd") // 打印当前目录
-        {
-            char pwd_buf[256];
-            // char *getcwd(char *buf, size_t size);
-            getcwd(pwd_buf, 255);
-            std::cout << pwd_buf << "\n";
-            continue;
-        }
-
-        if (args[0] == "cd")
-        {
-            // int chdir(const char *path);
-            if (args.size() > 1)
-            {
-                chdir(args[1].c_str());
-                // std::cout << "To be done!\n";
-            }
-            else
-            {
-                chdir(getenv("HOME"));
-            }
-            continue;
-        }
-
-        // 处理外部命令
-        external_command(args);
+        // 等待所有子进程结束
+        while (wait(nullptr) != -1) // wait调用失败则返回-1，表示没有子进程
+            ;
     }
 }
 
-void external_command(std::vector<std::string> args)
+void exec_command(command args)
+{
+    // 退出指令，已完工
+    if (args[0] == "exit")
+    {
+        if (args.size() <= 1)
+        {
+            exit(0);
+        }
+
+        // std::string 转 int
+        std::stringstream code_stream(args[1]);
+        int code = 0;
+        code_stream >> code;
+
+        // 转换失败
+        if (!code_stream.eof() || code_stream.fail())
+        {
+            std::cout << "Invalid exit code\n";
+            return;
+        }
+
+        exit(code);
+    }
+
+    if (args[0] == "pwd") // 打印当前目录
+    {
+        char pwd_buf[256];
+        // char *getcwd(char *buf, size_t size);
+        getcwd(pwd_buf, 255);
+        std::cout << pwd_buf << "\n";
+        return;
+    }
+
+    if (args[0] == "cd")
+    {
+        // int chdir(const char *path);
+        if (args.size() > 1)
+        {
+            chdir(args[1].c_str());
+            // std::cout << "To be done!\n";
+        }
+        else
+        {
+            chdir(getenv("HOME"));
+        }
+        return;
+    }
+    external_command(args); // 处理外部命令
+}
+
+void external_command(command args) // 处理外部命令
 {
     pid_t pid = fork();
-    // std::vector<std::string> 转 char **
+    // command 转 char **
     char *arg_ptrs[args.size() + 1];
     for (auto i = 0; i < args.size(); i++)
     {
@@ -117,7 +176,7 @@ void external_command(std::vector<std::string> args)
         execvp(args[0].c_str(), arg_ptrs);
 
         // 所以这里直接报错
-        exit(255);
+        exit(ERRNO_EXEC_FAIL);
     }
 
     // 这里只有父进程（原进程）才会进入
@@ -130,9 +189,9 @@ void external_command(std::vector<std::string> args)
 
 // 经典的 cpp string split 实现
 // https://stackoverflow.com/a/14266139/11691878
-std::vector<std::string> split(std::string s, const std::string &delimiter) // delimiter长度可以大于1
+command split(std::string s, const std::string &delimiter) // delimiter长度可以大于1
 {
-    std::vector<std::string> res;
+    command res;
     size_t pos = 0;
     std::string token;
     while ((pos = s.find(delimiter)) != std::string::npos)
@@ -143,4 +202,28 @@ std::vector<std::string> split(std::string s, const std::string &delimiter) // d
     }
     res.push_back(s);
     return res;
+}
+
+command_group command_grouping(command args, const std::string &delimiter) // 用于管道等指令分组情形
+{
+    command_group cmd_grp;
+    command cmd = new command();
+    int i;
+    for (i = 0; i < args.size(); i++)
+    {
+        if (args[i] != delimiter) // 非分隔符
+        {
+            cmd.push_back(args[i]);
+        }
+        else
+        {
+            cmd_grp.push_back(cmd);
+            command cmd = new command();
+        }
+    }
+    if (cmd.size() != 0)
+        cmd_grp.push_back(cmd);
+    else
+        delete cmd;
+    return cmd_grp;
 }
