@@ -207,7 +207,7 @@ command split(std::string s, const std::string &delimiter) // delimiter长度可
 command_group command_grouping(command args, const std::string &delimiter) // 用于管道等指令分组情形
 {
     command_group cmd_grp;
-    command cmd = new command();
+    command cmd = command();
     int i;
     for (i = 0; i < args.size(); i++)
     {
@@ -218,12 +218,10 @@ command_group command_grouping(command args, const std::string &delimiter) // �
         else
         {
             cmd_grp.push_back(cmd);
-            command cmd = new command();
+            cmd = command();
         }
     }
     if (cmd.size() != 0)
         cmd_grp.push_back(cmd);
-    else
-        delete cmd;
     return cmd_grp;
 }
