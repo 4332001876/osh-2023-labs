@@ -16,6 +16,8 @@
 #include <cstdlib>
 // 用于logging函数中的可变参数列表
 #include <cstdarg>
+// open()
+#include <fcntl.h>
 
 #define LOGGING_LEVEL 3 // 日志级别
 #define DEBUGGING 1
@@ -30,6 +32,9 @@ typedef std::vector<command> command_group;
 
 command split(std::string s, const std::string &delimiter);
 command_group command_grouping(command args, const std::string &delimiter);
+
+void redirect(command &args);
+
 void exec_command(command args);
 void external_command(command args);
 
@@ -125,6 +130,80 @@ int main()
         // 等待所有子进程结束
         while (wait(nullptr) != -1) // wait调用失败则返回-1，表示没有子进程
             ;
+    }
+}
+
+void redirect(command &args)
+{
+    int i;
+    // args.erase(args.begin()+i);
+    for (i = 0; i < args.size(); i++) // 这里args.size()是实时更新的，所以即使删了args元素也能保证正确性
+    {
+        if (args[i].substr(args[i].length() - 2) == ">>") // append
+        {
+            // fd字符串转数字
+            std::stringstream num_stream(args[i].substr(0, args[i].length() - 2)); // attention:remember to revise when copy!
+            int redirect_fd = 0;
+            num_stream >> redirect_fd;
+
+            int open_fd;
+            if (i == args.size() - 1) // 重定向后不带参数则直接舍弃
+            {
+                args.erase(args.begin() + i);
+                continue;
+            }
+            open_fd = open(args[i + 1].c_str(), O_WRONLY | O_CREAT | O_APPEND); // attention:remember to revise when copy!
+            // 转换失败，则进行正常重定向
+            if (!num_stream.eof() || num_stream.fail())
+            {
+                dup2(open_fd, STDOUT_FILENO); // attention:remember to revise when copy!
+            }
+            else // 否则重定向文件符指向的文件
+            {
+                dup2(open_fd, redirect_fd); // redirect_fd如果不存在则会自动打开
+            }
+            close(open_fd);
+            // 删除重定向涉及的两个参数
+            args.erase(args.begin() + i);
+            args.erase(args.begin() + i);
+        }
+        else if (args[i].substr(args[i].length() - 1) == ">") // write
+        {
+            // fd字符串转数字
+            std::stringstream num_stream(args[i].substr(0, args[i].length() - 1)); // attention:remember to revise when copy!
+            int redirect_fd = 0;
+            num_stream >> redirect_fd;
+
+            int open_fd;
+            if (i == args.size() - 1) // 重定向后不带参数则直接舍弃
+            {
+                args.erase(args.begin() + i);
+                continue;
+            }
+            open_fd = open(args[i + 1].c_str(), O_WRONLY | O_CREAT | O_TRUNC); // attention:remember to revise when copy!
+            // 转换失败，则进行正常重定向
+            if (!num_stream.eof() || num_stream.fail())
+            {
+                dup2(open_fd, STDOUT_FILENO); // attention:remember to revise when copy!
+            }
+            else // 否则重定向文件符指向的文件
+            {
+                dup2(open_fd, redirect_fd); // redirect_fd如果不存在则会自动打开
+            }
+            close(open_fd);
+            // 删除重定向涉及的两个参数
+            args.erase(args.begin() + i);
+            args.erase(args.begin() + i);
+        }
+        else if (args[i].substr(args[i].length() - 1) == "<") // read
+        {
+        }
+        else if (args[i] == "<<") // EOF read
+        {
+        }
+        else if (args[i] == "<<<") // string read
+        {
+        }
     }
 }
 
