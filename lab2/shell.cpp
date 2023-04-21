@@ -17,7 +17,7 @@
 // 用于logging函数中的可变参数列表
 #include <cstdarg>
 
-#define LOGGING_LEVEL 1 // 日志级别
+#define LOGGING_LEVEL 3 // 日志级别
 #define DEBUGGING 1
 #define INFO 2
 #define WARNING 3
@@ -65,8 +65,10 @@ int main()
         if (LOGGING_LEVEL <= DEBUGGING)
         {
             int i, j;
+            std::cout << cmd_grp.size() << "\n";
             for (i = 0; i < cmd_grp.size(); i++)
             {
+
                 for (j = 0; j < cmd_grp[i].size(); j++)
                 {
                     std::cout << cmd_grp[i][j].c_str() << " ";
@@ -104,11 +106,12 @@ int main()
                 if (i != 0)
                 {
 
-                    dup2(read_fd, STDOUT_FILENO);
+                    dup2(read_fd, STDIN_FILENO);
                     close(read_fd);
                 }
 
                 exec_command(cmd_grp[i]);
+                exit(0);
             }
             // 关闭父进程无用的管道端口
             if (i != 0)
@@ -238,6 +241,17 @@ command_group command_grouping(command args, const std::string &delimiter) // �
         else
         {
             cmd_grp.push_back(cmd);
+            if (LOGGING_LEVEL <= DEBUGGING)
+            {
+                int i;
+                std::cout << cmd.size() << "\n";
+                for (i = 0; i < cmd.size(); i++)
+                {
+
+                    std::cout << cmd[i].c_str() << " ";
+                }
+                std::cout << "\n";
+            }
             cmd = command();
         }
     }
