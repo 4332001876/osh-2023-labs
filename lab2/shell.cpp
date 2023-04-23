@@ -20,6 +20,8 @@
 #include <fcntl.h>
 // strlen()
 #include <cstring>
+// signal
+#include <signal.h>
 
 #define LOGGING_LEVEL 3 // 日志级别
 #define DEBUGGING 1
@@ -45,6 +47,8 @@ void redirect(command &args);
 void exec_command(command args, int is_pipe);
 void external_command(command args, int is_pipe);
 
+void ctrlc_handler(int signal);
+
 int main()
 {
     // 不同步 iostream 和 cstdio 的 buffer
@@ -52,6 +56,8 @@ int main()
     // c++中cin，cout效率比较低，是因为先把要输出的东西存入缓冲区与C语言中的stdio同步后，再输出，导致效率降低，
     // 而这段语句的作用是取消缓冲区同步，直接使用，由此可节省时间，使效率与scanf与printf相差无几。
     // 但需要注意的一点是，因为取消与stdio的同步之后，就不建议再使用printf与scanf了，否则实际输出就会与预期不符。只能用cin与cout
+
+    signal(SIGINT, ctrlc_handler);
 
     // 用来存储读入的一行命令
     std::string cmd;
@@ -66,16 +72,18 @@ int main()
         // 按空格分割命令为单词
         command args = split(cmd, " ");
 
+        // 没有可处理的命令
+        if (args.empty())
+        {
+            continue;
+        }
+
         run_cmd(args);
     }
 }
 void run_cmd(command &args)
 {
-    // 没有可处理的命令
-    if (args.empty())
-    {
-        continue;
-    }
+
     // 按管道分隔
     command_group cmd_grp = command_grouping(args, "|");
 
@@ -516,4 +524,13 @@ command_group command_grouping(command args, const std::string &delimiter) // �
     if (cmd.size() != 0)
         cmd_grp.push_back(cmd);
     return cmd_grp;
+}
+
+void ctrlc_handler(int signal)
+{
+    if (signal == SIGINT)
+    {
+        tcsetpgrp(STDIN_FILENO, getppid());
+        exit();
+    }
 }
