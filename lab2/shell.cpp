@@ -63,6 +63,11 @@ int main()
     std::string cmd;
     while (true)
     {
+        sigjmp_buf env;
+        if (sigsetjmp(env, 1))
+        {
+            printf("\n");
+        }
         // 打印提示符
         std::cout << "# ";
 
@@ -531,6 +536,7 @@ void ctrlc_handler(int signal)
     if (signal == SIGINT)
     {
         tcsetpgrp(STDIN_FILENO, getppid());
-        exit();
+        siglongjmp(env, 1);
+        exit(0);
     }
 }
