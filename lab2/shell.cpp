@@ -228,8 +228,18 @@ void redirect(command &args)
             args.erase(args.begin() + i);
             i--; // 和i++抵消，因为erase后下一回还要读取i位置的参数
         }
-        else if (args[i] == "<<") // EOF read
+        else if (args[i] == "<<") // EOF read，实现方式为管道
         {
+            int pipefd[2];               // 0为读出管道端口（接第i+1条指令），1为写入端口（接第i条指令）
+            int pipe_ret = pipe(pipefd); // 创建管道
+            if (pipe_ret < 0)
+            {
+                std::cout << "Failed to create pipe!\n";
+                exit(ERRNO_LIBRARY_FUN_FAILED);
+            }
+            dup2(pipefd[0], STDIN_FILENO);
+            close(pipefd[0]);
+
             std::string str_content;
 
             std::string str;
@@ -242,20 +252,32 @@ void redirect(command &args)
             std::stringstream str_stream(str_content);
             char *buf = (char *)malloc(2048 * sizeof(char));
             str_stream >> buf;
-            write(STDIN_FILENO, (void *)buf, strlen(buf));
+            write(pipefd[1], (void *)buf, strlen(buf));
+            close(pipefd[1]);
             free(buf);
             args.erase(args.begin() + i);
             args.erase(args.begin() + i);
             i--; // 和i++抵消，因为erase后下一回还要读取i位置的参数
         }
-        else if (args[i] == "<<<") // string read
+        else if (args[i] == "<<<") // string read，实现方式为管道
         {
+            int pipefd[2];               // 0为读出管道端口（接第i+1条指令），1为写入端口（接第i条指令）
+            int pipe_ret = pipe(pipefd); // 创建管道
+            if (pipe_ret < 0)
+            {
+                std::cout << "Failed to create pipe!\n";
+                exit(ERRNO_LIBRARY_FUN_FAILED);
+            }
+            dup2(pipefd[0], STDIN_FILENO);
+            close(pipefd[0]);
+
             // ssize_t write(int fd, const void *buf, size_t count);
             std::stringstream str_stream(args[i + 1]);
             str_stream << "\n\4";
             char *buf = (char *)malloc(2048 * sizeof(char));
             str_stream >> buf;
-            write(STDIN_FILENO, (void *)buf, strlen(buf));
+            write(pipefd[1], (void *)buf, strlen(buf));
+            close(pipefd[1]);
             free(buf);
             args.erase(args.begin() + i);
             args.erase(args.begin() + i);
