@@ -76,13 +76,15 @@ int main()
         {
             std::out << "\n";
         }
-        can_jump = 1;
+        
         // 打印提示符
         std::cout << "# ";
 
         // 读入一行。std::getline 结果不包含换行符。
         std::getline(std::cin, cmd);
 
+        can_jump = 1;
+        
         // 按空格分割命令为单词
         command args = split(cmd, " ");
 
