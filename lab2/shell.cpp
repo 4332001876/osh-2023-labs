@@ -238,6 +238,7 @@ void redirect(command &args)
                 std::cin >> str;
                 str_content = str_content + str + "\n";
             }
+            str_content = "\4";
             std::stringstream str_stream(str_content);
             char *buf = (char *)malloc(2048 * sizeof(char));
             str_stream >> buf;
@@ -251,7 +252,7 @@ void redirect(command &args)
         {
             // ssize_t write(int fd, const void *buf, size_t count);
             std::stringstream str_stream(args[i + 1]);
-            str_stream << "\n";
+            str_stream << "\n\4";
             char *buf = (char *)malloc(2048 * sizeof(char));
             str_stream >> buf;
             write(STDIN_FILENO, (void *)buf, strlen(buf));
