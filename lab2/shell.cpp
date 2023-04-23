@@ -468,7 +468,7 @@ void exec_command(command args, int is_pipe)
 
     if (args[0] == "wait") // 等待所有后台命令终止
     {
-        while (wpid = waitpid(-1, nullptr, WNOHANG) != -1) // wait调用失败则返回-1，表示没有子进程
+        while (waitpid(-1, nullptr, WNOHANG) != -1) // wait调用失败则返回-1，表示没有子进程
             ;
         return;
     }
