@@ -437,7 +437,7 @@ void external_command(command args, int is_pipe) // 处理外部命令
         // execvp 会完全更换子进程接下来的代码，所以正常情况下 execvp 之后这里的代码就没意义了
         // 如果 execvp 之后的代码被运行了，那就是 execvp 出问题了
         execvp(args[0].c_str(), arg_ptrs);
-        if (NOT_PIPE)
+        if (is_pipe == NOT_PIPE)
         {
             setpgrp();
         }
@@ -445,8 +445,11 @@ void external_command(command args, int is_pipe) // 处理外部命令
         // 所以这里直接报错
         exit(ERRNO_EXEC_FAIL);
     }
-    setpgid(pid, pid);
-    tcsetpgrp(STDIN_FILENO, pid);
+    if (is_pipe == NOT_PIPE)
+    {
+        setpgid(pid, pid);
+        tcsetpgrp(STDIN_FILENO, pid);
+    }
 
     // 这里只有父进程（原进程）才会进入
     int ret = wait(nullptr);
@@ -454,7 +457,10 @@ void external_command(command args, int is_pipe) // 处理外部命令
     {
         std::cout << "wait failed";
     }
-    tcsetpgrp(STDIN_FILENO, getpgrp());
+    if (is_pipe == NOT_PIPE)
+    {
+        tcsetpgrp(STDIN_FILENO, getpgrp());
+    }
 }
 
 // 经典的 cpp string split 实现
