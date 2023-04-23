@@ -150,7 +150,9 @@ void redirect(command &args)
     // args.erase(args.begin()+i);
     for (i = 0; i < args.size(); i++) // 这里args.size()是实时更新的，所以即使删了args元素也能保证正确性
     {
-        if (args[i].substr(args[i].length() - 2) == ">>") // append
+        if (args[i].length() == 0)
+            continue;
+        if (args[i].length() > 1 && args[i].substr(args[i].length() - 2) == ">>") // append
         {
             // fd字符串转数字
             std::stringstream num_stream(args[i].substr(0, args[i].length() - 2)); // attention:remember to revise when copy!
@@ -347,6 +349,10 @@ void exec_command(command args)
 
 void external_command(command args) // 处理外部命令
 {
+    if (args.empty())
+    {
+        return;
+    }
     pid_t pid = fork();
     // command 转 char **
     char *arg_ptrs[args.size() + 1];
