@@ -160,6 +160,7 @@ void redirect(command &args)
     {
         if (args[i].length() == 0)
             continue;
+
         if (args[i].length() > 1 && args[i].substr(args[i].length() - 2) == ">>") // append
         {
             // fd字符串转数字
@@ -230,6 +231,13 @@ void redirect(command &args)
         }
         else if (args[i] == "<<") // EOF read，实现方式为管道
         {
+            if (i == args.size() - 1) // 重定向后不带参数则直接舍弃
+            {
+                args.erase(args.begin() + i);
+                i--; // 和i++抵消，因为erase后下一回还要读取i位置的参数
+                continue;
+            }
+
             int pipefd[2];               // 0为读出管道端口（接第i+1条指令），1为写入端口（接第i条指令）
             int pipe_ret = pipe(pipefd); // 创建管道
             if (pipe_ret < 0)
@@ -248,10 +256,9 @@ void redirect(command &args)
                 std::cin >> str;
                 str_content = str_content + str + "\n";
             }
-            str_content = "\4";
-            std::stringstream str_stream(str_content);
+            str_content = str_content + "\4";
             char *buf = (char *)malloc(2048 * sizeof(char));
-            str_stream >> buf;
+            strcpy(buf, str_content.c_str());
             write(pipefd[1], (void *)buf, strlen(buf));
             close(pipefd[1]);
             free(buf);
@@ -261,6 +268,13 @@ void redirect(command &args)
         }
         else if (args[i] == "<<<") // string read，实现方式为管道
         {
+            if (i == args.size() - 1) // 重定向后不带参数则直接舍弃
+            {
+                args.erase(args.begin() + i);
+                i--; // 和i++抵消，因为erase后下一回还要读取i位置的参数
+                continue;
+            }
+
             int pipefd[2];               // 0为读出管道端口（接第i+1条指令），1为写入端口（接第i条指令）
             int pipe_ret = pipe(pipefd); // 创建管道
             if (pipe_ret < 0)
@@ -272,10 +286,9 @@ void redirect(command &args)
             close(pipefd[0]);
 
             // ssize_t write(int fd, const void *buf, size_t count);
-            std::stringstream str_stream(args[i + 1]);
-            str_stream << "\n\4";
+            std::string str_content = args[i + 1] + "\n\4";
             char *buf = (char *)malloc(2048 * sizeof(char));
-            str_stream >> buf;
+            strcpy(buf, str_content.c_str());
             write(pipefd[1], (void *)buf, strlen(buf));
             close(pipefd[1]);
             free(buf);
@@ -285,6 +298,7 @@ void redirect(command &args)
         }
         else if (args[i].substr(args[i].length() - 1) == "<") // read
         {
+
             // fd字符串转数字
             std::stringstream num_stream(args[i].substr(0, args[i].length() - 1)); // attention:remember to revise when copy!
             int redirect_fd = 0;
