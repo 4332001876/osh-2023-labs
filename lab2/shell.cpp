@@ -38,6 +38,8 @@ typedef std::vector<command> command_group;
 command split(std::string s, const std::string &delimiter);
 command_group command_grouping(command args, const std::string &delimiter);
 
+void run_cmd(command &args);
+
 void redirect(command &args);
 
 void exec_command(command args, int is_pipe);
@@ -64,108 +66,111 @@ int main()
         // 按空格分割命令为单词
         command args = split(cmd, " ");
 
-        // 没有可处理的命令
-        if (args.empty())
-        {
-            continue;
-        }
-        // 按管道分隔
-        command_group cmd_grp = command_grouping(args, "|");
-
-        /*if (LOGGING_LEVEL <= DEBUGGING)
-        {
-            int i, j;
-            std::cout << cmd_grp.size() << "\n";
-            for (i = 0; i < cmd_grp.size(); i++)
-            {
-
-                for (j = 0; j < cmd_grp[i].size(); j++)
-                {
-                    std::cout << cmd_grp[i][j].c_str() << " ";
-                }
-                std::cout << "\n";
-            }
-        }*/
-
-        int read_fd; // 上一个管道的读端口，即该条命令的输入
-        int cpgid;
-        if (cmd_grp.size() == 1)
-        {
-            int old_stdin_fd = dup(STDIN_FILENO);
-            int old_stdout_fd = dup(STDOUT_FILENO);
-            redirect(cmd_grp[0]); // 重定向
-            exec_command(cmd_grp[0], NOT_PIPE);
-            dup2(old_stdin_fd, STDIN_FILENO);
-            dup2(old_stdout_fd, STDOUT_FILENO);
-            close(old_stdin_fd);
-            close(old_stdout_fd);
-        }
-        else
-        {
-            for (int i = 0; i < cmd_grp.size(); i++)
-            {
-                int pipefd[2];               // 0为读出管道端口（接第i+1条指令），1为写入端口（接第i条指令）
-                if (i != cmd_grp.size() - 1) // 最后一次循环中不创建管道
-                {
-                    int pipe_ret = pipe(pipefd); // 创建管道
-                    if (pipe_ret < 0)
-                    {
-                        std::cout << "Failed to create pipe!\n";
-                        exit(ERRNO_LIBRARY_FUN_FAILED);
-                    }
-                }
-
-                int pid = fork();
-                if (pid == 0) // 第i条命令
-                {
-                    if (i == 0)
-                    {
-                        setpgrp();
-                    }
-                    // 重定向输出
-                    if (i != cmd_grp.size() - 1)
-                    {
-                        close(pipefd[0]); // 最后一条命令里pipe没有新建，故不需要关闭此端口
-                        dup2(pipefd[1], STDOUT_FILENO);
-                        close(pipefd[1]);
-                    }
-
-                    // 重定向输入
-                    if (i != 0)
-                    {
-
-                        dup2(read_fd, STDIN_FILENO);
-                        close(read_fd);
-                    }
-
-                    redirect(cmd_grp[i]); // 重定向，会覆盖管道的重定向
-
-                    exec_command(cmd_grp[i], IS_PIPE);
-                    exit(0);
-                }
-                if (i == 0)
-                {
-                    cpgid = pid;
-                }
-                setpgid(pid, cpgid);
-                // 关闭父进程无用的管道端口
-                if (i != 0)
-                    close(read_fd); // 已分发给子进程，可关闭
-                if (i != cmd_grp.size() - 1)
-                {
-                    read_fd = pipefd[0]; // 保存下一条命令需要的读端口
-                    close(pipefd[1]);    // 已分发给子进程，可关闭
-                }
-            }
-            tcsetpgrp(STDIN_FILENO, cpgid);
-        }
-        // 等待所有子进程结束
-        while (wait(nullptr) != -1) // wait调用失败则返回-1，表示没有子进程
-            ;
-        tcsetpgrp(STDIN_FILENO, getpgrp());
+        run_cmd(args);
     }
 }
+void run_cmd(command &args)
+{
+    // 没有可处理的命令
+    if (args.empty())
+    {
+        continue;
+    }
+    // 按管道分隔
+    command_group cmd_grp = command_grouping(args, "|");
 
+    /*if (LOGGING_LEVEL <= DEBUGGING)
+    {
+        int i, j;
+        std::cout << cmd_grp.size() << "\n";
+        for (i = 0; i < cmd_grp.size(); i++)
+        {
+
+            for (j = 0; j < cmd_grp[i].size(); j++)
+            {
+                std::cout << cmd_grp[i][j].c_str() << " ";
+            }
+            std::cout << "\n";
+        }
+    }*/
+
+    int read_fd; // 上一个管道的读端口，即该条命令的输入
+    int cpgid;
+    if (cmd_grp.size() == 1)
+    {
+        int old_stdin_fd = dup(STDIN_FILENO);
+        int old_stdout_fd = dup(STDOUT_FILENO);
+        redirect(cmd_grp[0]); // 重定向
+        exec_command(cmd_grp[0], NOT_PIPE);
+        dup2(old_stdin_fd, STDIN_FILENO);
+        dup2(old_stdout_fd, STDOUT_FILENO);
+        close(old_stdin_fd);
+        close(old_stdout_fd);
+    }
+    else
+    {
+        for (int i = 0; i < cmd_grp.size(); i++)
+        {
+            int pipefd[2];               // 0为读出管道端口（接第i+1条指令），1为写入端口（接第i条指令）
+            if (i != cmd_grp.size() - 1) // 最后一次循环中不创建管道
+            {
+                int pipe_ret = pipe(pipefd); // 创建管道
+                if (pipe_ret < 0)
+                {
+                    std::cout << "Failed to create pipe!\n";
+                    exit(ERRNO_LIBRARY_FUN_FAILED);
+                }
+            }
+
+            int pid = fork();
+            if (pid == 0) // 第i条命令
+            {
+                if (i == 0)
+                {
+                    setpgrp();
+                }
+                // 重定向输出
+                if (i != cmd_grp.size() - 1)
+                {
+                    close(pipefd[0]); // 最后一条命令里pipe没有新建，故不需要关闭此端口
+                    dup2(pipefd[1], STDOUT_FILENO);
+                    close(pipefd[1]);
+                }
+
+                // 重定向输入
+                if (i != 0)
+                {
+
+                    dup2(read_fd, STDIN_FILENO);
+                    close(read_fd);
+                }
+
+                redirect(cmd_grp[i]); // 重定向，会覆盖管道的重定向
+
+                exec_command(cmd_grp[i], IS_PIPE);
+                exit(0);
+            }
+            if (i == 0)
+            {
+                cpgid = pid;
+            }
+            setpgid(pid, cpgid);
+            // 关闭父进程无用的管道端口
+            if (i != 0)
+                close(read_fd); // 已分发给子进程，可关闭
+            if (i != cmd_grp.size() - 1)
+            {
+                read_fd = pipefd[0]; // 保存下一条命令需要的读端口
+                close(pipefd[1]);    // 已分发给子进程，可关闭
+            }
+        }
+        tcsetpgrp(STDIN_FILENO, cpgid);
+    }
+    // 等待所有子进程结束
+    while (wait(nullptr) != -1) // wait调用失败则返回-1，表示没有子进程
+        ;
+    tcsetpgrp(STDIN_FILENO, getpgrp());
+}
 void redirect(command &args)
 // 考虑了一条指令多个重定向的可能性，后面的重定向会覆盖前面的重定向
 {
