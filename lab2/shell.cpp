@@ -86,7 +86,6 @@ int main()
         if (cmd_grp.size() == 1)
         {
             redirect(cmd_grp[0]); // 重定向，会覆盖管道的重定向
-
             exec_command(cmd_grp[0]);
         }
         else
