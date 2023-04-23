@@ -50,8 +50,8 @@ void external_command(command args, int is_pipe);
 
 void ctrlc_handler(int signal);
 
-static sigjmp_buf env;
-static volatile sig_atomic_t can_jump; // volatile, 声明变量值的一致性；static,声明变量的唯一性。
+// static sigjmp_buf env;
+// static volatile sig_atomic_t can_jump; // volatile, 声明变量值的一致性；static,声明变量的唯一性。
 int shell_pid;
 
 int main()
@@ -72,10 +72,10 @@ int main()
     while (true)
     {
 
-        if (sigsetjmp(env, 1)) // sigsetjmp()会保存目前堆栈环境，然后将目前的地址作一个记号，而在程序其他地方调用siglongjmp()时便会直接跳到这个记号位置，然后还原堆栈，继续程序的执行。
+        /*if (sigsetjmp(env, 1)) // sigsetjmp()会保存目前堆栈环境，然后将目前的地址作一个记号，而在程序其他地方调用siglongjmp()时便会直接跳到这个记号位置，然后还原堆栈，继续程序的执行。
         {
             std::cout << "\n";
-        }
+        }*/
 
         // 打印提示符
         std::cout << "# ";
@@ -83,7 +83,7 @@ int main()
         // 读入一行。std::getline 结果不包含换行符。
         std::getline(std::cin, cmd);
 
-        can_jump = 1;
+        // can_jump = 1;
 
         // 按空格分割命令为单词
         command args = split(cmd, " ");
@@ -562,12 +562,13 @@ command_group command_grouping(command args, const std::string &delimiter) // �
 
 void ctrlc_handler(int signal)
 {
-    if (can_jump == 0)
-        exit(0);
+    // if (can_jump == 0)        exit(0);
     if (signal == SIGINT)
     {
-        // tcsetpgrp(STDIN_FILENO, getppid());
-        siglongjmp(env, 1);
+        if (getpid() != shell_pid)
+            tcsetpgrp(STDIN_FILENO, getppid());
+        exit(0);
+        // siglongjmp(env, 1);
         /*
         char c = '\0';
         std::cin >> c;
