@@ -67,7 +67,7 @@ int main()
         // 按管道分隔
         command_group cmd_grp = command_grouping(args, "|");
 
-        if (LOGGING_LEVEL <= DEBUGGING)
+        /*if (LOGGING_LEVEL <= DEBUGGING)
         {
             int i, j;
             std::cout << cmd_grp.size() << "\n";
@@ -80,53 +80,62 @@ int main()
                 }
                 std::cout << "\n";
             }
-        }
+        }*/
 
         int read_fd; // 上一个管道的读端口，即该条命令的输入
-        for (int i = 0; i < cmd_grp.size(); i++)
+        if (cmd_grp.size() == 1)
         {
-            int pipefd[2];               // 0为读出管道端口（接第i+1条指令），1为写入端口（接第i条指令）
-            if (i != cmd_grp.size() - 1) // 最后一次循环中不创建管道
-            {
-                int pipe_ret = pipe(pipefd); // 创建管道
-                if (pipe_ret < 0)
-                {
-                    std::cout << "Failed to create pipe!\n";
-                    exit(ERRNO_LIBRARY_FUN_FAILED);
-                }
-            }
+            redirect(cmd_grp[0]); // 重定向，会覆盖管道的重定向
 
-            int pid = fork();
-            if (pid == 0) // 第i条命令
+            exec_command(cmd_grp[0]);
+        }
+        else
+        {
+            for (int i = 0; i < cmd_grp.size(); i++)
             {
-                // 重定向输出
+                int pipefd[2];               // 0为读出管道端口（接第i+1条指令），1为写入端口（接第i条指令）
+                if (i != cmd_grp.size() - 1) // 最后一次循环中不创建管道
+                {
+                    int pipe_ret = pipe(pipefd); // 创建管道
+                    if (pipe_ret < 0)
+                    {
+                        std::cout << "Failed to create pipe!\n";
+                        exit(ERRNO_LIBRARY_FUN_FAILED);
+                    }
+                }
+
+                int pid = fork();
+                if (pid == 0) // 第i条命令
+                {
+                    // 重定向输出
+                    if (i != cmd_grp.size() - 1)
+                    {
+                        close(pipefd[0]); // 最后一条命令里pipe没有新建，故不需要关闭此端口
+                        dup2(pipefd[1], STDOUT_FILENO);
+                        close(pipefd[1]);
+                    }
+
+                    // 重定向输入
+                    if (i != 0)
+                    {
+
+                        dup2(read_fd, STDIN_FILENO);
+                        close(read_fd);
+                    }
+
+                    redirect(cmd_grp[i]); // 重定向，会覆盖管道的重定向
+
+                    exec_command(cmd_grp[i]);
+                    exit(0);
+                }
+                // 关闭父进程无用的管道端口
+                if (i != 0)
+                    close(read_fd); // 已分发给子进程，可关闭
                 if (i != cmd_grp.size() - 1)
                 {
-                    close(pipefd[0]); // 最后一条命令里pipe没有新建，故不需要关闭此端口
-                    dup2(pipefd[1], STDOUT_FILENO);
-                    close(pipefd[1]);
+                    read_fd = pipefd[0]; // 保存下一条命令需要的读端口
+                    close(pipefd[1]);    // 已分发给子进程，可关闭
                 }
-
-                // 重定向输入
-                if (i != 0)
-                {
-
-                    dup2(read_fd, STDIN_FILENO);
-                    close(read_fd);
-                }
-
-                redirect(cmd_grp[i]); // 重定向，会覆盖管道的重定向
-
-                exec_command(cmd_grp[i]);
-                exit(0);
-            }
-            // 关闭父进程无用的管道端口
-            if (i != 0)
-                close(read_fd); // 已分发给子进程，可关闭
-            if (i != cmd_grp.size() - 1)
-            {
-                read_fd = pipefd[0]; // 保存下一条命令需要的读端口
-                close(pipefd[1]);    // 已分发给子进程，可关闭
             }
         }
         // 等待所有子进程结束
@@ -210,6 +219,38 @@ void redirect(command &args)
             args.erase(args.begin() + i);
             i--; // 和i++抵消，因为erase后下一回还要读取i位置的参数
         }
+        else if (args[i] == "<<") // EOF read
+        {
+            std::string str_content;
+
+            std::string str;
+            while (str != args[i + 1])
+            {
+                std::cin >> str;
+                str_content = str_content + str + "\n";
+            }
+            std::stringstream str_stream(str_content);
+            char *buf = (char *)malloc(2048 * sizeof(char));
+            str_stream >> buf;
+            write(STDIN_FILENO, (void *)buf, 2048);
+            free(buf);
+            args.erase(args.begin() + i);
+            args.erase(args.begin() + i);
+            i--; // 和i++抵消，因为erase后下一回还要读取i位置的参数
+        }
+        else if (args[i] == "<<<") // string read
+        {
+            // ssize_t write(int fd, const void *buf, size_t count);
+            std::stringstream str_stream(args[i + 1]);
+            str_stream << "\n";
+            char *buf = (char *)malloc(2048 * sizeof(char));
+            str_stream >> buf;
+            write(STDIN_FILENO, (void *)buf, 2048);
+            free(buf);
+            args.erase(args.begin() + i);
+            args.erase(args.begin() + i);
+            i--; // 和i++抵消，因为erase后下一回还要读取i位置的参数
+        }
         else if (args[i].substr(args[i].length() - 1) == "<") // read
         {
             // fd字符串转数字
@@ -240,38 +281,6 @@ void redirect(command &args)
             }
             close(open_fd);
             // 删除重定向涉及的两个参数
-            args.erase(args.begin() + i);
-            args.erase(args.begin() + i);
-            i--; // 和i++抵消，因为erase后下一回还要读取i位置的参数
-        }
-        else if (args[i] == "<<") // EOF read
-        {
-            std::string str_content;
-
-            std::string str;
-            while (str != args[i + 1])
-            {
-                std::cin >> str;
-                str_content = str_content + str + "\n";
-            }
-            std::stringstream str_stream(str_content);
-            char *buf = (char *)malloc(2048 * sizeof(char));
-            str_stream >> buf;
-            write(STDIN_FILENO, (void *)buf, 2048);
-            free(buf);
-            args.erase(args.begin() + i);
-            args.erase(args.begin() + i);
-            i--; // 和i++抵消，因为erase后下一回还要读取i位置的参数
-        }
-        else if (args[i] == "<<<") // string read
-        {
-            // ssize_t write(int fd, const void *buf, size_t count);
-            std::stringstream str_stream(args[i + 1]);
-            str_stream << "\n";
-            char *buf = (char *)malloc(2048 * sizeof(char));
-            str_stream >> buf;
-            write(STDIN_FILENO, (void *)buf, 2048);
-            free(buf);
             args.erase(args.begin() + i);
             args.erase(args.begin() + i);
             i--; // 和i++抵消，因为erase后下一回还要读取i位置的参数
@@ -399,7 +408,7 @@ command_group command_grouping(command args, const std::string &delimiter) // �
         else
         {
             cmd_grp.push_back(cmd);
-            if (LOGGING_LEVEL <= DEBUGGING)
+            /*if (LOGGING_LEVEL <= DEBUGGING)
             {
                 int i;
                 std::cout << cmd.size() << "\n";
@@ -409,7 +418,7 @@ command_group command_grouping(command args, const std::string &delimiter) // �
                     std::cout << cmd[i].c_str() << " ";
                 }
                 std::cout << "\n";
-            }
+            }*/
             cmd = command();
         }
     }
