@@ -567,6 +567,11 @@ void ctrlc_handler(int signal)
     if (signal == SIGINT)
     {
         // tcsetpgrp(STDIN_FILENO, getppid());
-        siglongjmp(env, 1); // 直接将当前进程当做主进程
+        char c = "\0";
+        std::cin >> c;
+        if (c)                  // 缓冲区非空
+            siglongjmp(env, 1); // 直接将当前进程当做主进程
+        else
+            exit(0);
     }
 }
