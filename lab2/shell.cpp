@@ -105,10 +105,15 @@ int main()
             {
                 signal(SIGTTOU, SIG_DFL);
                 setpgrp();
-                run_cmd(args, IS_BG);
+                run_cmd(args, NOT_BG);
                 exit(0);
             }
             setpgid(pid, pid);
+            int ret = wait(nullptr);
+            if (ret < 0)
+            {
+                std::cout << "wait failed";
+            }
         }
         else
             run_cmd(args, NOT_BG);
