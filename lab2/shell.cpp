@@ -29,6 +29,9 @@
 #define ERRNO_LIBRARY_FUN_FAILED 10
 #define ERRNO_EXEC_FAIL 255
 
+#define IS_PIPE 1
+#define NOT_PIPE 0
+
 typedef std::vector<std::string> command;
 typedef std::vector<command> command_group;
 
@@ -37,8 +40,8 @@ command_group command_grouping(command args, const std::string &delimiter);
 
 void redirect(command &args);
 
-void exec_command(command args);
-void external_command(command args);
+void exec_command(command args, int is_pipe);
+void external_command(command args, int is_pipe);
 
 int main()
 {
@@ -85,12 +88,13 @@ int main()
         }*/
 
         int read_fd; // 上一个管道的读端口，即该条命令的输入
+        int cpgid;
         if (cmd_grp.size() == 1)
         {
             int old_stdin_fd = dup(STDIN_FILENO);
             int old_stdout_fd = dup(STDOUT_FILENO);
             redirect(cmd_grp[0]); // 重定向
-            exec_command(cmd_grp[0]);
+            exec_command(cmd_grp[0], NOT_PIPE);
             dup2(old_stdin_fd, STDIN_FILENO);
             dup2(old_stdout_fd, STDOUT_FILENO);
             close(old_stdin_fd);
@@ -114,6 +118,10 @@ int main()
                 int pid = fork();
                 if (pid == 0) // 第i条命令
                 {
+                    if (i == 0)
+                    {
+                        setpgrp();
+                    }
                     // 重定向输出
                     if (i != cmd_grp.size() - 1)
                     {
@@ -132,9 +140,14 @@ int main()
 
                     redirect(cmd_grp[i]); // 重定向，会覆盖管道的重定向
 
-                    exec_command(cmd_grp[i]);
+                    exec_command(cmd_grp[i], IS_PIPE);
                     exit(0);
                 }
+                if (i == 0)
+                {
+                    cpgid = pid;
+                }
+                setpgid(pid, cpgid);
                 // 关闭父进程无用的管道端口
                 if (i != 0)
                     close(read_fd); // 已分发给子进程，可关闭
@@ -144,10 +157,12 @@ int main()
                     close(pipefd[1]);    // 已分发给子进程，可关闭
                 }
             }
+            tcsetpgrp(STDIN_FILENO, cpgid);
         }
         // 等待所有子进程结束
         while (wait(nullptr) != -1) // wait调用失败则返回-1，表示没有子进程
             ;
+        tcsetpgrp(STDIN_FILENO, getpgrp());
     }
 }
 
@@ -230,7 +245,6 @@ void redirect(command &args)
             i--; // 和i++抵消，因为erase后下一回还要读取i位置的参数
         }
         else if (args[i] == "<<") // EOF read，实现方式为管道
-        //
         {
             if (i == args.size() - 1) // 重定向后不带参数则直接舍弃
             {
@@ -341,7 +355,7 @@ void redirect(command &args)
     }
 }
 
-void exec_command(command args)
+void exec_command(command args, int is_pipe)
 {
     // 退出指令，已完工
     if (args[0] == "exit")
@@ -398,10 +412,10 @@ void exec_command(command args)
         return;
     }
 
-    external_command(args); // 处理外部命令
+    external_command(args, is_pipe); // 处理外部命令
 }
 
-void external_command(command args) // 处理外部命令
+void external_command(command args, int is_pipe) // 处理外部命令
 {
     if (args.empty())
     {
@@ -423,10 +437,16 @@ void external_command(command args) // 处理外部命令
         // execvp 会完全更换子进程接下来的代码，所以正常情况下 execvp 之后这里的代码就没意义了
         // 如果 execvp 之后的代码被运行了，那就是 execvp 出问题了
         execvp(args[0].c_str(), arg_ptrs);
+        if (NOT_PIPE)
+        {
+            setpgrp();
+        }
 
         // 所以这里直接报错
         exit(ERRNO_EXEC_FAIL);
     }
+    setpgid(pid, pid);
+    tcsetpgrp(STDIN_FILENO, pid);
 
     // 这里只有父进程（原进程）才会进入
     int ret = wait(nullptr);
@@ -434,6 +454,7 @@ void external_command(command args) // 处理外部命令
     {
         std::cout << "wait failed";
     }
+    tcsetpgrp(STDIN_FILENO, getpgrp());
 }
 
 // 经典的 cpp string split 实现
