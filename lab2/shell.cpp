@@ -102,10 +102,12 @@ int main()
             {
                 setpgrp();
                 run_cmd(args);
+                exit(0);
             }
             setpgid(pid, pid);
         }
-        run_cmd(args);
+        else
+            run_cmd(args);
     }
 }
 void run_cmd(command &args)
@@ -160,7 +162,7 @@ void run_cmd(command &args)
             int pid = fork();
             if (pid == 0) // 第i条命令
             {
-                // signal(SIGTTOU, SIG_DFL);
+                signal(SIGTTOU, SIG_DFL);
                 if (i == 0)
                 {
                     setpgrp();
@@ -430,6 +432,7 @@ void exec_command(command args, int is_pipe)
         char pwd_buf[256] = {0};
         // char *getcwd(char *buf, size_t size);
         getcwd(pwd_buf, 255);
+        pwd_buf[strlen(pwd_buf)] = '\n';
         // std::cout << pwd_buf << "\n";
         // ssize_t write(int fd, const void *buf, size_t count);
         write(STDOUT_FILENO, (void *)pwd_buf, strlen(pwd_buf));
@@ -479,7 +482,7 @@ void external_command(command args, int is_pipe) // 处理外部命令
 
     if (pid == 0)
     {
-        // signal(SIGTTOU, SIG_DFL);
+        signal(SIGTTOU, SIG_DFL);
         if (is_pipe == NOT_PIPE)
         {
             setpgrp();
