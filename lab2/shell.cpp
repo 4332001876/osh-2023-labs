@@ -18,6 +18,8 @@
 #include <cstdarg>
 // open()
 #include <fcntl.h>
+// strlen()
+#include <cstring>
 
 #define LOGGING_LEVEL 3 // 日志级别
 #define DEBUGGING 1
@@ -85,8 +87,14 @@ int main()
         int read_fd; // 上一个管道的读端口，即该条命令的输入
         if (cmd_grp.size() == 1)
         {
-            redirect(cmd_grp[0]); // 重定向，会覆盖管道的重定向
+            int old_stdin_fd = dup(STDIN_FILENO);
+            int old_stdout_fd = dup(STDOUT_FILENO);
+            redirect(cmd_grp[0]); // 重定向
             exec_command(cmd_grp[0]);
+            dup2(old_stdin_fd, STDIN_FILENO);
+            dup2(old_stdout_fd, STDOUT_FILENO);
+            close(old_stdin_fd);
+            close(old_stdout_fd);
         }
         else
         {
@@ -166,7 +174,7 @@ void redirect(command &args)
                 i--; // 和i++抵消，因为erase后下一回还要读取i位置的参数
                 continue;
             }
-            open_fd = open(args[i + 1].c_str(), O_WRONLY | O_CREAT | O_APPEND); // attention:remember to revise when copy!
+            open_fd = open(args[i + 1].c_str(), O_WRONLY | O_CREAT | O_APPEND, S_IRWXU | S_IRWXG | S_IRWXO); // attention:remember to revise when copy!
             // 转换失败，则进行正常重定向
             if (open_fd < 0)
             {
@@ -200,7 +208,7 @@ void redirect(command &args)
                 i--; // 和i++抵消，因为erase后下一回还要读取i位置的参数
                 continue;
             }
-            open_fd = open(args[i + 1].c_str(), O_WRONLY | O_CREAT | O_TRUNC); // attention:remember to revise when copy!
+            open_fd = open(args[i + 1].c_str(), O_WRONLY | O_CREAT | O_TRUNC, S_IRWXU | S_IRWXG | S_IRWXO); // attention:remember to revise when copy!
             // 转换失败，则进行正常重定向
             if (open_fd < 0)
             {
@@ -233,7 +241,7 @@ void redirect(command &args)
             std::stringstream str_stream(str_content);
             char *buf = (char *)malloc(2048 * sizeof(char));
             str_stream >> buf;
-            write(STDIN_FILENO, (void *)buf, 2048);
+            write(STDIN_FILENO, (void *)buf, strlen(buf));
             free(buf);
             args.erase(args.begin() + i);
             args.erase(args.begin() + i);
@@ -246,7 +254,7 @@ void redirect(command &args)
             str_stream << "\n";
             char *buf = (char *)malloc(2048 * sizeof(char));
             str_stream >> buf;
-            write(STDIN_FILENO, (void *)buf, 2048);
+            write(STDIN_FILENO, (void *)buf, strlen(buf));
             free(buf);
             args.erase(args.begin() + i);
             args.erase(args.begin() + i);
@@ -266,7 +274,7 @@ void redirect(command &args)
                 i--; // 和i++抵消，因为erase后下一回还要读取i位置的参数
                 continue;
             }
-            open_fd = open(args[i + 1].c_str(), O_RDONLY); // attention:remember to revise when copy!
+            open_fd = open(args[i + 1].c_str(), O_RDONLY, S_IRWXU | S_IRWXG | S_IRWXO); // attention:remember to revise when copy!
             // 转换失败，则进行正常重定向
             if (open_fd < 0)
             {
@@ -316,10 +324,12 @@ void exec_command(command args)
 
     if (args[0] == "pwd") // 打印当前目录
     {
-        char pwd_buf[256];
+        char pwd_buf[256] = {0};
         // char *getcwd(char *buf, size_t size);
         getcwd(pwd_buf, 255);
-        std::cout << pwd_buf << "\n";
+        // std::cout << pwd_buf << "\n";
+        // ssize_t write(int fd, const void *buf, size_t count);
+        write(STDOUT_FILENO, (void *)pwd_buf, strlen(pwd_buf));
         return;
     }
 
