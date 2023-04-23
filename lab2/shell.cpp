@@ -167,7 +167,7 @@ void run_cmd(command &args, int is_bg)
             if (pid == 0) // 第i条命令
             {
                 signal(SIGTTOU, SIG_DFL);
-                if (is_bg == IS_BG)
+                if (is_bg == NOT_BG)
                 {
                     if (i == 0)
                     {
@@ -199,7 +199,7 @@ void run_cmd(command &args, int is_bg)
                 exec_command(cmd_grp[i], IS_PIPE);
                 exit(0);
             }
-            if (is_bg == IS_BG)
+            if (is_bg == NOT_BG)
             {
                 if (i == 0)
                 {
@@ -216,13 +216,13 @@ void run_cmd(command &args, int is_bg)
                 close(pipefd[1]);    // 已分发给子进程，可关闭
             }
         }
-        if (is_bg == IS_BG)
+        if (is_bg == NOT_BG)
             tcsetpgrp(STDIN_FILENO, cpgid);
     }
     // 等待所有子进程结束
     while (wait(nullptr) != -1) // wait调用失败则返回-1，表示没有子进程
         ;
-    if (is_bg == IS_BG)
+    if (is_bg == NOT_BG)
         tcsetpgrp(STDIN_FILENO, getpgrp());
 }
 void redirect(command &args)
