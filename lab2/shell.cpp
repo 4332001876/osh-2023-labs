@@ -230,6 +230,7 @@ void redirect(command &args)
             i--; // 和i++抵消，因为erase后下一回还要读取i位置的参数
         }
         else if (args[i] == "<<") // EOF read，实现方式为管道
+        //
         {
             if (i == args.size() - 1) // 重定向后不带参数则直接舍弃
             {
@@ -245,20 +246,26 @@ void redirect(command &args)
                 std::cout << "Failed to create pipe!\n";
                 exit(ERRNO_LIBRARY_FUN_FAILED);
             }
-            dup2(pipefd[0], STDIN_FILENO);
-            close(pipefd[0]);
 
             std::string str_content;
 
             std::string str;
+            std::getline(std::cin, str);
             while (str != args[i + 1])
             {
-                std::cin >> str;
+                if (LOGGING_LEVEL <= DEBUGGING)
+                {
+                    std::cerr << str << "\n";
+                    std::cerr << args[i + 1] << "\n";
+                }
                 str_content = str_content + str + "\n";
+                std::getline(std::cin, str);
             }
             str_content = str_content + "\4";
             char *buf = (char *)malloc(2048 * sizeof(char));
             strcpy(buf, str_content.c_str());
+            dup2(pipefd[0], STDIN_FILENO);
+            close(pipefd[0]);
             write(pipefd[1], (void *)buf, strlen(buf));
             close(pipefd[1]);
             free(buf);
