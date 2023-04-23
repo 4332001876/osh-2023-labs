@@ -566,8 +566,24 @@ void ctrlc_handler(int signal)
     if (signal == SIGINT)
     {
         if (getpid() != shell_pid)
+        {
             tcsetpgrp(STDIN_FILENO, getppid());
-        exit(0);
+            exit(0);
+        }
+        else
+        {
+            int nCharInCin = std::cin.rdbuf()->in_avail();
+            if (nCharInCin)
+            {
+                std::cin.ignore(nCharInCin + 1);
+                std::cin.clear();
+                std::cout << "\n# ";
+            }
+            else
+            {
+                exit(0);
+            }
+        }
         // siglongjmp(env, 1);
         /*
         char c = '\0';
