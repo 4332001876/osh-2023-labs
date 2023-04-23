@@ -22,6 +22,7 @@
 #include <cstring>
 // signal
 #include <signal.h>
+#include <setjmp.h>
 
 #define LOGGING_LEVEL 3 // 日志级别
 #define DEBUGGING 1
@@ -51,6 +52,7 @@ void ctrlc_handler(int signal);
 
 int main()
 {
+    vector<int> bg_pid;
     // 不同步 iostream 和 cstdio 的 buffer
     std::ios::sync_with_stdio(false);
     // c++中cin，cout效率比较低，是因为先把要输出的东西存入缓冲区与C语言中的stdio同步后，再输出，导致效率降低，
@@ -63,7 +65,7 @@ int main()
     std::string cmd;
     while (true)
     {
-        sigjmp_buf env;
+        static sigjmp_buf env;
         if (sigsetjmp(env, 1))
         {
             printf("\n");
@@ -141,6 +143,10 @@ void run_cmd(command &args)
                 if (i == 0)
                 {
                     setpgrp();
+                }
+                else
+                {
+                    setpgid(0, cpgid);
                 }
                 // 重定向输出
                 if (i != cmd_grp.size() - 1)
