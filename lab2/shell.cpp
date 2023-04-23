@@ -96,7 +96,7 @@ int main()
 
         if (args[args.size() - 1] == "&")
         {
-            args.erase(args.back());
+            args.erase(args.begin() + (args.size() - 1));
             int pid = fork();
             if (pid == 0)
             {
@@ -567,11 +567,13 @@ void ctrlc_handler(int signal)
     if (signal == SIGINT)
     {
         // tcsetpgrp(STDIN_FILENO, getppid());
-        char c = "\0";
+        siglongjmp(env, 1);
+        /*
+        char c = '\0';
         std::cin >> c;
         if (c)                  // 缓冲区非空
             siglongjmp(env, 1); // 直接将当前进程当做主进程
         else
-            exit(0);
+            exit(0);*/
     }
 }
