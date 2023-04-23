@@ -35,13 +35,16 @@
 #define IS_PIPE 1
 #define NOT_PIPE 0
 
+#define IS_BG 1
+#define NOT_BG 0
+
 typedef std::vector<std::string> command;
 typedef std::vector<command> command_group;
 
 command split(std::string s, const std::string &delimiter);
 command_group command_grouping(command args, const std::string &delimiter);
 
-void run_cmd(command &args);
+void run_cmd(command &args, int is_bg);
 
 void redirect(command &args);
 
@@ -100,17 +103,18 @@ int main()
             int pid = fork();
             if (pid == 0)
             {
+                signal(SIGTTOU, SIG_DFL);
                 setpgrp();
-                run_cmd(args);
+                run_cmd(args, IS_BG);
                 exit(0);
             }
             setpgid(pid, pid);
         }
         else
-            run_cmd(args);
+            run_cmd(args, NOT_BG);
     }
 }
-void run_cmd(command &args)
+void run_cmd(command &args, int is_bg)
 {
 
     // 按管道分隔
@@ -163,13 +167,16 @@ void run_cmd(command &args)
             if (pid == 0) // 第i条命令
             {
                 signal(SIGTTOU, SIG_DFL);
-                if (i == 0)
+                if (is_bg == IS_BG)
                 {
-                    setpgrp();
-                }
-                else
-                {
-                    setpgid(0, cpgid);
+                    if (i == 0)
+                    {
+                        setpgrp();
+                    }
+                    else
+                    {
+                        setpgid(0, cpgid);
+                    }
                 }
                 // 重定向输出
                 if (i != cmd_grp.size() - 1)
@@ -192,11 +199,14 @@ void run_cmd(command &args)
                 exec_command(cmd_grp[i], IS_PIPE);
                 exit(0);
             }
-            if (i == 0)
+            if (is_bg == IS_BG)
             {
-                cpgid = pid;
+                if (i == 0)
+                {
+                    cpgid = pid;
+                }
+                setpgid(pid, cpgid);
             }
-            setpgid(pid, cpgid);
             // 关闭父进程无用的管道端口
             if (i != 0)
                 close(read_fd); // 已分发给子进程，可关闭
@@ -206,12 +216,14 @@ void run_cmd(command &args)
                 close(pipefd[1]);    // 已分发给子进程，可关闭
             }
         }
-        tcsetpgrp(STDIN_FILENO, cpgid);
+        if (is_bg == IS_BG)
+            tcsetpgrp(STDIN_FILENO, cpgid);
     }
     // 等待所有子进程结束
     while (wait(nullptr) != -1) // wait调用失败则返回-1，表示没有子进程
         ;
-    tcsetpgrp(STDIN_FILENO, getpgrp());
+    if (is_bg == IS_BG)
+        tcsetpgrp(STDIN_FILENO, getpgrp());
 }
 void redirect(command &args)
 // 考虑了一条指令多个重定向的可能性，后面的重定向会覆盖前面的重定向
@@ -570,7 +582,7 @@ void ctrlc_handler(int signal)
     {
         if (getpid() != shell_pid)
         {
-            tcsetpgrp(STDIN_FILENO, getppid());
+            tcsetpgrp(STDIN_FILENO, getpgid(getppid()));
             exit(0);
         }
         else
