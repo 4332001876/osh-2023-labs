@@ -115,6 +115,8 @@ int main()
                     close(read_fd);
                 }
 
+                redirect(cmd_grp[i]); // 重定向，会覆盖管道的重定向
+
                 exec_command(cmd_grp[i]);
                 exit(0);
             }
@@ -134,6 +136,7 @@ int main()
 }
 
 void redirect(command &args)
+// 考虑了一条指令多个重定向的可能性，后面的重定向会覆盖前面的重定向
 {
     int i;
     // args.erase(args.begin()+i);
@@ -150,11 +153,16 @@ void redirect(command &args)
             if (i == args.size() - 1) // 重定向后不带参数则直接舍弃
             {
                 args.erase(args.begin() + i);
+                i--; // 和i++抵消，因为erase后下一回还要读取i位置的参数
                 continue;
             }
             open_fd = open(args[i + 1].c_str(), O_WRONLY | O_CREAT | O_APPEND); // attention:remember to revise when copy!
             // 转换失败，则进行正常重定向
-            if (!num_stream.eof() || num_stream.fail())
+            if (open_fd < 0)
+            {
+                std::cout << "Failed to open file!\n";
+            }
+            else if (!num_stream.eof() || num_stream.fail())
             {
                 dup2(open_fd, STDOUT_FILENO); // attention:remember to revise when copy!
             }
@@ -166,6 +174,7 @@ void redirect(command &args)
             // 删除重定向涉及的两个参数
             args.erase(args.begin() + i);
             args.erase(args.begin() + i);
+            i--; // 和i++抵消，因为erase后下一回还要读取i位置的参数
         }
         else if (args[i].substr(args[i].length() - 1) == ">") // write
         {
@@ -178,11 +187,16 @@ void redirect(command &args)
             if (i == args.size() - 1) // 重定向后不带参数则直接舍弃
             {
                 args.erase(args.begin() + i);
+                i--; // 和i++抵消，因为erase后下一回还要读取i位置的参数
                 continue;
             }
             open_fd = open(args[i + 1].c_str(), O_WRONLY | O_CREAT | O_TRUNC); // attention:remember to revise when copy!
             // 转换失败，则进行正常重定向
-            if (!num_stream.eof() || num_stream.fail())
+            if (open_fd < 0)
+            {
+                std::cout << "Failed to open file!\n";
+            }
+            else if (!num_stream.eof() || num_stream.fail())
             {
                 dup2(open_fd, STDOUT_FILENO); // attention:remember to revise when copy!
             }
@@ -194,15 +208,73 @@ void redirect(command &args)
             // 删除重定向涉及的两个参数
             args.erase(args.begin() + i);
             args.erase(args.begin() + i);
+            i--; // 和i++抵消，因为erase后下一回还要读取i位置的参数
         }
         else if (args[i].substr(args[i].length() - 1) == "<") // read
         {
+            // fd字符串转数字
+            std::stringstream num_stream(args[i].substr(0, args[i].length() - 1)); // attention:remember to revise when copy!
+            int redirect_fd = 0;
+            num_stream >> redirect_fd;
+
+            int open_fd;
+            if (i == args.size() - 1) // 重定向后不带参数则直接舍弃
+            {
+                args.erase(args.begin() + i);
+                i--; // 和i++抵消，因为erase后下一回还要读取i位置的参数
+                continue;
+            }
+            open_fd = open(args[i + 1].c_str(), O_RDONLY); // attention:remember to revise when copy!
+            // 转换失败，则进行正常重定向
+            if (open_fd < 0)
+            {
+                std::cout << "Failed to open file!\n";
+            }
+            else if (!num_stream.eof() || num_stream.fail())
+            {
+                dup2(open_fd, STDIN_FILENO); // attention:remember to revise when copy!
+            }
+            else // 否则重定向文件符指向的文件
+            {
+                dup2(open_fd, redirect_fd); // redirect_fd如果不存在则会自动打开
+            }
+            close(open_fd);
+            // 删除重定向涉及的两个参数
+            args.erase(args.begin() + i);
+            args.erase(args.begin() + i);
+            i--; // 和i++抵消，因为erase后下一回还要读取i位置的参数
         }
         else if (args[i] == "<<") // EOF read
         {
+            std::string str_content;
+
+            std::string str;
+            while (str != args[i + 1])
+            {
+                std::cin >> str;
+                str_content = str_content + str + "\n";
+            }
+            std::stringstream str_stream(str_content);
+            char *buf = (char *)malloc(2048 * sizeof(char));
+            str_stream >> buf;
+            write(STDIN_FILENO, (void *)buf, 2048);
+            free(buf);
+            args.erase(args.begin() + i);
+            args.erase(args.begin() + i);
+            i--; // 和i++抵消，因为erase后下一回还要读取i位置的参数
         }
         else if (args[i] == "<<<") // string read
         {
+            // ssize_t write(int fd, const void *buf, size_t count);
+            std::stringstream str_stream(args[i + 1]);
+            str_stream << "\n";
+            char *buf = (char *)malloc(2048 * sizeof(char));
+            str_stream >> buf;
+            write(STDIN_FILENO, (void *)buf, 2048);
+            free(buf);
+            args.erase(args.begin() + i);
+            args.erase(args.begin() + i);
+            i--; // 和i++抵消，因为erase后下一回还要读取i位置的参数
         }
     }
 }
@@ -255,6 +327,13 @@ void exec_command(command args)
         }
         return;
     }
+
+    if (args[0] == "wait") // 等待所有后台命令终止
+    {
+        // TODO:
+        return;
+    }
+
     external_command(args); // 处理外部命令
 }
 
