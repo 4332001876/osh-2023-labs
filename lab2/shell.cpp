@@ -51,9 +51,11 @@ void external_command(command args, int is_pipe);
 void ctrlc_handler(int signal);
 
 sigjmp_buf env;
+int shell_pid;
 
 int main()
 {
+    shell_pid = getpid();
     std::vector<int> bg_pid;
     // 不同步 iostream 和 cstdio 的 buffer
     std::ios::sync_with_stdio(false);
@@ -143,7 +145,7 @@ void run_cmd(command &args)
             int pid = fork();
             if (pid == 0) // 第i条命令
             {
-                signal(SIGTTOU, SIG_DFL);
+                // signal(SIGTTOU, SIG_DFL);
                 if (i == 0)
                 {
                     setpgrp();
@@ -461,7 +463,7 @@ void external_command(command args, int is_pipe) // 处理外部命令
 
     if (pid == 0)
     {
-        signal(SIGTTOU, SIG_DFL);
+        // signal(SIGTTOU, SIG_DFL);
         if (is_pipe == NOT_PIPE)
         {
             setpgrp();
@@ -470,7 +472,6 @@ void external_command(command args, int is_pipe) // 处理外部命令
         // execvp 会完全更换子进程接下来的代码，所以正常情况下 execvp 之后这里的代码就没意义了
         // 如果 execvp 之后的代码被运行了，那就是 execvp 出问题了
         execvp(args[0].c_str(), arg_ptrs);
-        
 
         // 所以这里直接报错
         exit(ERRNO_EXEC_FAIL);
@@ -545,10 +546,11 @@ command_group command_grouping(command args, const std::string &delimiter) // �
 
 void ctrlc_handler(int signal)
 {
-    if (signal == SIGINT)
+    if (signal == SIGINT && getpid() != shell_pid)
     {
-        tcsetpgrp(STDIN_FILENO, getppid());
-        siglongjmp(env, 1);
+        // tcsetpgrp(STDIN_FILENO, getppid());
+        if (getpid() == getpgrp())
+            siglongjmp(env, 1);
         exit(0);
     }
 }
