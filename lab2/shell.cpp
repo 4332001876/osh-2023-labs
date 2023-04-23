@@ -50,12 +50,13 @@ void external_command(command args, int is_pipe);
 
 void ctrlc_handler(int signal);
 
-sigjmp_buf env;
-int shell_pid;
+static sigjmp_buf env;
+static volatile sig_atomic_t can_jump; // volatile, 声明变量值的一致性；static,声明变量的唯一性。
+// int shell_pid;
 
 int main()
 {
-    shell_pid = getpid();
+    // shell_pid = getpid();
     std::vector<int> bg_pid;
     // 不同步 iostream 和 cstdio 的 buffer
     std::ios::sync_with_stdio(false);
@@ -71,10 +72,11 @@ int main()
     while (true)
     {
 
-        if (sigsetjmp(env, 1))
+        if (sigsetjmp(env, 1)) // sigsetjmp()会保存目前堆栈环境，然后将目前的地址作一个记号，而在程序其他地方调用siglongjmp()时便会直接跳到这个记号位置，然后还原堆栈，继续程序的执行。
         {
-            printf("\n");
+            std::out << "\n";
         }
+        can_jump = 1;
         // 打印提示符
         std::cout << "# ";
 
@@ -546,11 +548,11 @@ command_group command_grouping(command args, const std::string &delimiter) // �
 
 void ctrlc_handler(int signal)
 {
-    if (signal == SIGINT && getpid() != shell_pid)
+    if (signal == SIGINT)
     {
         // tcsetpgrp(STDIN_FILENO, getppid());
-        if (getpid() == getpgrp())
-            siglongjmp(env, 1);
-        exit(0);
+        if (can_jump == 0)
+            exit(0);
+        siglongjmp(env, 1); // 直接将当前进程当做主进程
     }
 }
