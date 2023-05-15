@@ -1,11 +1,12 @@
 use std::cmp::Ordering;
-use std::fs;
-use std::io::{prelude::*, BufReader}; //prelude引入一堆trait
-use std::net::{TcpListener, TcpStream};
-use std::sync::mpsc; //Multi-producer, single-consumer
-use std::sync::{Arc, Mutex};
-use std::thread;
-use std::time::Duration;
+use async_std::fs;
+use async_std::io::{prelude::*, BufReader}; //prelude引入一堆trait
+use async_std::net::TcpListener;
+use async_std::net::TcpStream;
+use async_std::task;
+use futures::stream::StreamExt;
+use async_std::prelude::*;
+use async_std::io::{Read, Write};
 
 #[derive(Debug)]
 struct RequestInfo {
@@ -25,35 +26,60 @@ impl RequestInfo {
     }
 }
 
-fn main() {
-    let listener = TcpListener::bind("127.0.0.1:8000").unwrap(); //绑定监听端口
-    let mut handles = vec![];
-    for stream in listener.incoming() {
-        let stream = stream.unwrap();
-
-        let handle = thread::spawn(move || handle_clnt(stream)); //新建线程
-        handles.push(handle);
+#[async_std::main]
+async fn main() {
+    let listener = TcpListener::bind("127.0.0.1:8000").await.unwrap(); //绑定监听端口
+    listener
+        .incoming()
+        .for_each_concurrent(None, |stream| async move {
+            let stream = stream.unwrap();
+        handle_clnt(stream).await;
         println!("Connection established!");
-    }
-    for handle in handles {
-        handle.join().unwrap();
-    } //阻塞，等待所有线程执行完毕，否则程序会在某些线程未执行完时退出，并会导致这些线程直接退出
-      /*let (tx, rx) = mpsc::channel();
-      thread::spawn(move || {
-          let val = String::from("hi");
-          tx.send(val).unwrap();
-      });
-      let received = rx.recv().unwrap();
-      println!("Got: {}", received);*/
+        })
+        .await;//使用 for_each_concurrent 并发地处理从 Stream 获取的元素
+
+    /*let (tx, rx) = mpsc::channel();
+    thread::spawn(move || {
+        let val = String::from("hi");
+        tx.send(val).unwrap();
+    });
+    let received = rx.recv().unwrap();
+    println!("Got: {}", received);*/
 }
 
-fn handle_clnt(mut stream: TcpStream) {
-    let buf_reader = BufReader::new(&mut stream); //接受流输入
-    let http_request: Vec<_> = buf_reader
+async fn handle_clnt(mut stream: TcpStream) {
+    let mut buf_reader = BufReader::new(&mut stream); //接受流输入
+    /*let http_request: Vec<_> = buf_reader
         .lines()
         .map(|result| result.unwrap()) //lines操作的result
         .take_while(|line| !line.is_empty()) //类似于filter的trait行为, std::iter::Iterator::take_while
-        .collect();
+        .collect();*/
+    /*let http_request=vec![];
+    for line in buf_reader.lines(){
+        if(!line.unwrap().is_empty())
+        {http_request.push(line.unwrap())}
+    }*/
+    /*let mut buffer = [0; 1024];
+    stream.read(&mut buffer).await.unwrap();
+    let http_request=buffer.split('\n').collect().iter().map(|result| String::from(result)).collect();*/
+    let mut http_request=vec![];
+    let mut blank_counter=0;
+    loop{
+    let mut line = String::new();
+    let len = buf_reader.read_line(&mut line).await;
+    if(line.is_empty())
+    {
+        blank_counter=blank_counter+1;
+    }
+    else
+    {
+        blank_counter=0;
+    }
+    if(blank_counter>=2){
+        break
+    }
+    http_request.push(line);
+}
 
     /*println!("Request: {:#?}", http_request); //Vec<String>
     let http_request1 = vec![
@@ -80,7 +106,7 @@ fn handle_clnt(mut stream: TcpStream) {
     let mut content_len = 0;
     let mut contents: Vec<u8> = Vec::new();
     if (status_code == 200) {
-        let content_read = get_uri_content(&request_info.uri, "./webroot");
+        let content_read = get_uri_content(&request_info.uri, "./webroot").await;
         //println!("{:?}", content_read);
         contents = match content_read {
             Ok(content) => {
@@ -102,14 +128,14 @@ fn handle_clnt(mut stream: TcpStream) {
     }
     let response = format!("{status_line}\r\nContent-Length: {content_len}\r\n\r\n");
     stream
-        .write_all(&[response.as_bytes(), &contents].concat())
+        .write_all(&[response.as_bytes(), &contents].concat()).await
         .unwrap();
     //println!("{:?}", &[response.as_bytes(), &contents].concat());
     //stream.write_all(&contents).unwrap();
     //bytes: &[u8]
     //vec.append(&mut vec2);
 }
-fn get_uri_content(uri: &str, web_root: &str) -> Result<Vec<u8>, std::io::Error> {
+async fn get_uri_content(uri: &str, web_root: &str) -> Result<Vec<u8>, std::io::Error> {
     let mut final_uri = String::from(web_root);
     final_uri.push_str(uri);
     let idx = (final_uri.len() - 1);
@@ -119,7 +145,7 @@ fn get_uri_content(uri: &str, web_root: &str) -> Result<Vec<u8>, std::io::Error>
         final_uri.push_str("index.html");
     }
     //println!("{:?}", final_uri);
-    fs::read(final_uri)
+    fs::read(final_uri).await
 }
 fn parse_request(request_lines: &Vec<String>) -> Option<RequestInfo> {
     if request_lines.len() < 2 {
