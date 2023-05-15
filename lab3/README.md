@@ -2,7 +2,12 @@
 **罗浩铭PB21030838**
 
 ## 编译和运行方法说明
+直接在项目路径内打开terminal，运行指令`cargo run`即可编译运行，按ctrl+C可直接中止
 
+注意：网络资源的根目录为：lab3\server\webroot！！！！！
+
+打开另一个terminal，用于输入HTTP请求测试指令，便可以看到HTTP响应结果：
+<img src="./pic/open page success 3.png" width="90%">
 
 
 ### 使用注意
@@ -28,7 +33,13 @@ rust的多线程开发十分方便，并且rust的所有权的特性也使得线
 
 
 ## 使用 siege 测试的结果和分析
-
+测试使用我的个人主页与一个3.4MB大小的Linux内核镜像bzImage。
+测试方式为以并发数50测试10次。
+对仅仅实现了最简单的多线程版本进行测试的结果如下：
+个人主页：
+<img src="./pic/siege%20html%20simple%20thread.png" width="90%">
+bzImage：
+<img src="./pic/siege%20bzimage%20simple%20thread.png" width="90%">
 
 
 
