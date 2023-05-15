@@ -48,7 +48,7 @@ async fn main() {
 }
 
 async fn handle_clnt(mut stream: TcpStream) {
-    let mut buf_reader = BufReader::new(&mut stream); //接受流输入
+    //let mut buf_reader = BufReader::new(&mut stream); //接受流输入
     /*let http_request: Vec<_> = buf_reader
         .lines()
         .map(|result| result.unwrap()) //lines操作的result
@@ -59,27 +59,24 @@ async fn handle_clnt(mut stream: TcpStream) {
         if(!line.unwrap().is_empty())
         {http_request.push(line.unwrap())}
     }*/
-    /*let mut buffer = [0; 1024];
+
+    let mut buffer = [0; 1024];
     stream.read(&mut buffer).await.unwrap();
-    let http_request=buffer.split('\n').collect().iter().map(|result| String::from(result)).collect();*/
-    let mut http_request=vec![];
-    let mut blank_counter=0;
-    loop{
-    let mut line = String::new();
-    let len = buf_reader.read_line(&mut line).await;
-    if(line.is_empty())
-    {
-        blank_counter=blank_counter+1;
-    }
-    else
-    {
-        blank_counter=0;
-    }
-    if(blank_counter>=2){
-        break
-    }
-    http_request.push(line);
-}
+    let mut vec_buffer=vec![];
+    for i in 0..1024{
+        if(buffer[i]==0)
+         {break}
+         else{vec_buffer.push(buffer[i]);}}
+   // let http_request=vec![];
+    let http_request: Vec<_> = String::from_utf8(vec_buffer).unwrap()
+        .lines()
+        .map(|result| String::from(result)) //lines操作的result
+        .take_while(|line| !line.is_empty()) //类似于filter的trait行为, std::iter::Iterator::take_while
+        .collect();
+    /*let buffer_str:String=String::from(buffer);
+    let http_request=vec![];
+    for line in buffer.split("\r\n"){
+    http_request.push(String::from(line));}*/
 
     /*println!("Request: {:#?}", http_request); //Vec<String>
     let http_request1 = vec![
