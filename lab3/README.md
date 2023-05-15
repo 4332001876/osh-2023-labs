@@ -3,6 +3,7 @@
 
 ## 编译和运行方法说明
 直接在项目路径内打开terminal，运行指令`cargo run`即可编译运行，按ctrl+C可直接中止
+此处实现了异步IO，若要使用multi_thread版本，请将`main_multi_thread.rs`改名为`main.rs`再编译运行
 
 注意：网络资源的根目录为：lab3\server\webroot！！！！！
 
