@@ -3,6 +3,9 @@ use std::fs;
 use std::io::{prelude::*, BufReader}; //prelude引入一堆trait
 use std::net::{TcpListener, TcpStream};
 use std::sync::mpsc; //Multi-producer, single-consumer
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::Duration;
 
 #[derive(Debug)]
 struct RequestInfo {
@@ -24,20 +27,24 @@ impl RequestInfo {
 
 fn main() {
     let listener = TcpListener::bind("127.0.0.1:8000").unwrap(); //绑定监听端口
-
+    let mut handles = vec![];
     for stream in listener.incoming() {
         let stream = stream.unwrap();
-        handle_clnt(stream);
+
+        let handle = thread::spawn(move || handle_clnt(stream)); //新建线程
+        handles.push(handle);
         println!("Connection established!");
     }
-
-    /*let (tx, rx) = mpsc::channel();
-    thread::spawn(move || {
-        let val = String::from("hi");
-        tx.send(val).unwrap();
-    });
-    let received = rx.recv().unwrap();
-    println!("Got: {}", received);*/
+    for handle in handles {
+        handle.join().unwrap();
+    } //阻塞，等待所有线程执行完毕，否则程序会在某些线程未执行完时退出，并会导致这些线程直接退出
+      /*let (tx, rx) = mpsc::channel();
+      thread::spawn(move || {
+          let val = String::from("hi");
+          tx.send(val).unwrap();
+      });
+      let received = rx.recv().unwrap();
+      println!("Got: {}", received);*/
 }
 
 fn handle_clnt(mut stream: TcpStream) {
