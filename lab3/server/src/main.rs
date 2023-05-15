@@ -77,7 +77,7 @@ fn handle_clnt(mut stream: TcpStream) {
         //println!("{:?}", content_read);
         contents = match content_read {
             Ok(content) => {
-                content_len = contents.len();
+                content_len = content.len();
                 content
             }
             Err(_) => {
