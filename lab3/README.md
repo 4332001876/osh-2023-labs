@@ -31,17 +31,21 @@ rust的多线程开发十分方便，并且rust的所有权的特性也使得线
 只需用`let handle = thread::spawn(move || handle_clnt(stream));`语句就可以新建线程处理一个请求。
 此处将所有handle装入一个Vec中，并在程序最后用`handle.join()`语句阻塞程序以等待所有线程执行完毕，否则程序会在某些线程未执行完时退出，并会导致这些线程直接退出。
 
-
+### 使用async/await
+将所有必要的std库改为async_std库，给耗时较长的函数加上async标识符，并在所有异步函数调用的返回值后加上.await.unwrap()，并对少量与异步类型不匹配的代码进行修改，即可将程序变为异步版本。
 
 ## 使用 siege 测试的结果和分析
 测试使用我的个人主页与一个3.4MB大小的Linux内核镜像bzImage。
+### 测试1
 测试方式为以并发数50测试10次。
-对仅仅实现了最简单的多线程版本进行测试的结果如下：
+对多线程版本进行测试的结果如下：
 个人主页：
 <img src="./pic/siege%20html%20simple%20thread.png" width="90%">
 bzImage：
 <img src="./pic/siege%20bzimage%20simple%20thread.png" width="90%">
+对异步版本进行测试的结果如下：
 
+### 测试2
 
 
 
