@@ -44,6 +44,11 @@ rust的多线程开发十分方便，并且rust的所有权的特性也使得线
 bzImage：
 <img src="./pic/siege%20bzimage%20simple%20thread.png" width="90%">
 对异步版本进行测试的结果如下：
+个人主页：
+<img src="./pic/siege%20html%20async.png" width="90%">
+bzImage：
+<img src="./pic/siege%20bzimage%20async.png" width="90%">
+可以看出异步版本的测试结果稍慢于
 
 ### 测试2
 
