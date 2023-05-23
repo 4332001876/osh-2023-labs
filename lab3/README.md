@@ -2,8 +2,8 @@
 **罗浩铭PB21030838**
 
 ## 编译和运行方法说明
-直接在项目路径内打开terminal，运行指令`cargo run`即可编译运行，按ctrl+C可直接中止
-此处实现了异步IO，若要使用multi_thread版本，请将`main_multi_thread.rs`改名为`main.rs`再编译运行
+直接在项目路径内打开terminal，运行指令`cargo run --bin server`即可编译运行，按ctrl+C可直接中止
+此处实现了异步IO，若要使用multi_thread版本，需运行指令`cargo run --bin server_multi`
 
 注意：网络资源的根目录为：lab3\server\webroot！！！！！
 
@@ -26,6 +26,10 @@ Rust提供的std::net提供了非常方便的建立连接的方式，将一个Tc
 ### 错误处理
 由于rust的语言特性本身，其编译器就能保证只要通过编译，程序中出现的错误将会极少，则我们需要检查的地方不多，主要集中在可能出错的文件读写，以及用户输入格式不规范方面。请求格式错误或不为GET请求则设错误状态码500，否则读入资源失败（即找不到资源）则设错误状态码404，再将状态码返回给客户端。
 
+下图为输入错误网址得到404错误码响应：
+<img src="./pic/server%20404.png" width="90%">
+
+
 ### 多线程并发
 rust的多线程开发十分方便，并且rust的所有权的特性也使得线程间通信十分方便。
 只需用`let handle = thread::spawn(move || handle_clnt(stream));`语句就可以新建线程处理一个请求。
@@ -39,21 +43,31 @@ rust的多线程开发十分方便，并且rust的所有权的特性也使得线
 ### 测试1
 测试方式为以并发数50测试10次。
 对多线程版本进行测试的结果如下：
-个人主页：
+个人主页，吞吐率为6.71MB/sec：
 <img src="./pic/siege%20html%20simple%20thread.png" width="90%">
-bzImage：
+bzImage，吞吐率为393.39MB/sec：
 <img src="./pic/siege%20bzimage%20simple%20thread.png" width="90%">
 对异步版本进行测试的结果如下：
-个人主页：
+个人主页，吞吐率为4.54MB/sec：
 <img src="./pic/siege%20html%20async.png" width="90%">
-bzImage：
+bzImage，吞吐率为300.53MB/sec：
 <img src="./pic/siege%20bzimage%20async.png" width="90%">
-可以看出异步版本的测试结果稍慢于
+可以看出异步版本的测试结果稍慢于多线程版本，没有出现丢包情况。这说明异步版本仍没有充分利用线程资源。
 
 ### 测试2
+测试方式为以并发数255测试10次，目的是测试高并发下server的表现。
+对多线程版本进行测试的结果如下：
+个人主页，吞吐率为4.45MB/sec：
+<img src="./pic/high%20concurrency%20siege%20html%20simple%20thread.png" width="90%">
+bzImage，吞吐率为356.07MB/sec：
+<img src="./pic/high%20concurrency%20siege%20bzimage%20simple%20thread.png" width="90%">
+对异步版本进行测试的结果如下：
+个人主页，吞吐率为4.77MB/sec：
+<img src="./pic/high%20concurrency%20siege%20html%20async.png" width="90%">
+bzImage，高并发下会出现少量丢包，吞吐率为252.92MB/sec：
+<img src="./pic/high%20concurrency%20siege%20bzimage%20async.png" width="90%">
 
-
-
+可以看出高并发下，对于小文件，异步版本的测试结果稍快于多线程版本，这可能是由于读取小文件建立I/O通信通道时间占比明显大于大文件，而异步实现使得等待建立信道的时间可被省去；对于大文件，异步版本测试结果慢于多线程版本，且出现丢包情况，这可能是由于异步机制缺乏同步机制保证文件传输的可靠性。
 
 
 
