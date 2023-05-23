@@ -2,10 +2,13 @@
 name = "server"
 version = "0.1.0"
 edition = "2021"
-default-run = "a"
 
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+name = "server_multi"
+path = "src/main_multi_thread.rs"
 
 [dependencies]
 futures = "0.3"
@@ -13,3 +16,6 @@ futures = "0.3"
 [dependencies.async-std]
 version = "1.6"
 features = ["attributes"]
+
+
+
